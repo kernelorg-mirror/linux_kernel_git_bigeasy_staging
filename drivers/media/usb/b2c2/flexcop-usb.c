@@ -429,7 +429,7 @@ static int flexcop_usb_transfer_init(struct flexcop_usb *fc_usb)
 	u16 frame_size = le16_to_cpu(
 		fc_usb->uintf->cur_altsetting->endpoint[0].desc.wMaxPacketSize);
 	int bufsize = B2C2_USB_NUM_ISO_URB * B2C2_USB_FRAMES_PER_ISO *
-		frame_size, i, j, ret;
+		frame_size, i, ret;
 	int buffer_offset = 0;
 
 	deb_ts("creating %d iso-urbs with %d frames each of %d bytes size = %d.\n",
@@ -456,29 +456,18 @@ static int flexcop_usb_transfer_init(struct flexcop_usb *fc_usb)
 
 	/* initialising and submitting iso urbs */
 	for (i = 0; i < B2C2_USB_NUM_ISO_URB; i++) {
-		int frame_offset = 0;
 		struct urb *urb = fc_usb->iso_urb[i];
 		deb_ts("initializing and submitting urb no. %d (buf_offset: %d).\n",
 		       i, buffer_offset);
 
-		urb->dev = fc_usb->udev;
-		urb->context = fc_usb;
-		urb->complete = flexcop_usb_urb_complete;
-		urb->pipe = B2C2_USB_DATA_PIPE;
-		urb->transfer_flags = URB_ISO_ASAP;
-		urb->interval = 1;
-		urb->number_of_packets = B2C2_USB_FRAMES_PER_ISO;
-		urb->transfer_buffer_length = frame_size * B2C2_USB_FRAMES_PER_ISO;
-		urb->transfer_buffer = fc_usb->iso_buffer + buffer_offset;
+		usb_fill_iso_urb(urb, fc_usb->udev, B2C2_USB_DATA_PIPE,
+				 fc_usb->iso_buffer + buffer_offset,
+				 frame_size * B2C2_USB_FRAMES_PER_ISO,
+				 flexcop_usb_urb_complete, fc_usb, 1,
+				 B2C2_USB_FRAMES_PER_ISO, frame_size);
 
+		urb->transfer_flags = URB_ISO_ASAP;
 		buffer_offset += frame_size * B2C2_USB_FRAMES_PER_ISO;
-		for (j = 0; j < B2C2_USB_FRAMES_PER_ISO; j++) {
-			deb_ts("urb no: %d, frame: %d, frame_offset: %d\n",
-					i, j, frame_offset);
-			urb->iso_frame_desc[j].offset = frame_offset;
-			urb->iso_frame_desc[j].length = frame_size;
-			frame_offset += frame_size;
-		}
 
 		if ((ret = usb_submit_urb(fc_usb->iso_urb[i],GFP_ATOMIC))) {
 			err("submitting urb %d failed with %d.", i, ret);
