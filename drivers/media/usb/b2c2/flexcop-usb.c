@@ -461,15 +461,13 @@ static int flexcop_usb_transfer_init(struct flexcop_usb *fc_usb)
 		deb_ts("initializing and submitting urb no. %d (buf_offset: %d).\n",
 		       i, buffer_offset);
 
-		urb->dev = fc_usb->udev;
-		urb->context = fc_usb;
-		urb->complete = flexcop_usb_urb_complete;
-		urb->pipe = B2C2_USB_DATA_PIPE;
+		usb_fill_int_urb(urb, fc_usb->udev, B2C2_USB_DATA_PIPE,
+				 fc_usb->iso_buffer + buffer_offset,
+				 frame_size * B2C2_USB_FRAMES_PER_ISO,
+				 flexcop_usb_urb_complete, fc_usb, 1);
+
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->interval = 1;
 		urb->number_of_packets = B2C2_USB_FRAMES_PER_ISO;
-		urb->transfer_buffer_length = frame_size * B2C2_USB_FRAMES_PER_ISO;
-		urb->transfer_buffer = fc_usb->iso_buffer + buffer_offset;
 
 		buffer_offset += frame_size * B2C2_USB_FRAMES_PER_ISO;
 		for (j = 0; j < B2C2_USB_FRAMES_PER_ISO; j++) {
