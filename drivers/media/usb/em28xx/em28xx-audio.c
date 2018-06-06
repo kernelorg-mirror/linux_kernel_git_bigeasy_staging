@@ -877,15 +877,13 @@ static int em28xx_audio_urb_init(struct em28xx *dev)
 		}
 		dev->adev.transfer_buffer[i] = buf;
 
-		urb->dev = udev;
-		urb->context = dev;
-		urb->pipe = usb_rcvisocpipe(udev, EM28XX_EP_AUDIO);
+		usb_fill_int_urb(urb, udev,
+				 usb_rcvisocpipe(udev, EM28XX_EP_AUDIO),
+				 buf, ep_size * npackets, em28xx_audio_isocirq,
+				 dev, ep->bInterval);
+
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-		urb->transfer_buffer = buf;
-		urb->interval = interval;
-		urb->complete = em28xx_audio_isocirq;
 		urb->number_of_packets = npackets;
-		urb->transfer_buffer_length = ep_size * npackets;
 
 		for (j = k = 0; j < npackets; j++, k += ep_size) {
 			urb->iso_frame_desc[j].offset = k;
