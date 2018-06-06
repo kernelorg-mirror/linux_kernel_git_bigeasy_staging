@@ -698,39 +698,40 @@ static int create_urbs(struct gspca_dev *gspca_dev,
 	}
 
 	for (n = 0; n < nurbs; n++) {
+		void *buf;
+
 		urb = usb_alloc_urb(npkt, GFP_KERNEL);
 		if (!urb)
 			return -ENOMEM;
 		gspca_dev->urb[n] = urb;
-		urb->transfer_buffer = usb_alloc_coherent(gspca_dev->dev,
+		buf = usb_alloc_coherent(gspca_dev->dev,
 						bsize,
 						GFP_KERNEL,
 						&urb->transfer_dma);
 
-		if (urb->transfer_buffer == NULL) {
+		if (buf == NULL) {
 			pr_err("usb_alloc_coherent failed\n");
 			return -ENOMEM;
 		}
-		urb->dev = gspca_dev->dev;
-		urb->context = gspca_dev;
-		urb->transfer_buffer_length = bsize;
 		if (npkt != 0) {		/* ISOC */
-			urb->pipe = usb_rcvisocpipe(gspca_dev->dev,
-						    ep->desc.bEndpointAddress);
+			usb_fill_int_urb(urb, gspca_dev->dev,
+					 usb_rcvisocpipe(gspca_dev->dev, ep->desc.bEndpointAddress),
+					 buf, bsize, isoc_irq, gspca_dev,
+					 ep->desc.bInterval);
+
 			urb->transfer_flags = URB_ISO_ASAP
 					| URB_NO_TRANSFER_DMA_MAP;
-			urb->interval = 1 << (ep->desc.bInterval - 1);
-			urb->complete = isoc_irq;
 			urb->number_of_packets = npkt;
 			for (i = 0; i < npkt; i++) {
 				urb->iso_frame_desc[i].length = psize;
 				urb->iso_frame_desc[i].offset = psize * i;
 			}
 		} else {		/* bulk */
-			urb->pipe = usb_rcvbulkpipe(gspca_dev->dev,
-						ep->desc.bEndpointAddress);
+			usb_fill_bulk_urb(urb, gspca_dev->dev,
+					 usb_rcvbulkpipe(gspca_dev->dev, ep->desc.bEndpointAddress),
+					 buf, bsize, bulk_irq, gspca_dev);
+
 			urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
-			urb->complete = bulk_irq;
 		}
 	}
 	return 0;
