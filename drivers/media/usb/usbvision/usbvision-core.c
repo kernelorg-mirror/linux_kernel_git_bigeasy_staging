@@ -2302,16 +2302,14 @@ int usbvision_init_isoc(struct usb_usbvision *usbvision)
 					   sb_size,
 					   GFP_KERNEL,
 					   &urb->transfer_dma);
-		urb->dev = dev;
-		urb->context = usbvision;
-		urb->pipe = usb_rcvisocpipe(dev, usbvision->video_endp);
+		usb_fill_int_urb(urb, dev,
+				 usb_rcvisocpipe(dev, usbvision->video_endp),
+				 usbvision->sbuf[buf_idx].data,
+				 usbvision->isoc_packet_size * USBVISION_URB_FRAMES,
+				 usbvision_isoc_irq, usbvision, 1);
+
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-		urb->interval = 1;
-		urb->transfer_buffer = usbvision->sbuf[buf_idx].data;
-		urb->complete = usbvision_isoc_irq;
 		urb->number_of_packets = USBVISION_URB_FRAMES;
-		urb->transfer_buffer_length =
-		    usbvision->isoc_packet_size * USBVISION_URB_FRAMES;
 		for (j = k = 0; j < USBVISION_URB_FRAMES; j++,
 		     k += usbvision->isoc_packet_size) {
 			urb->iso_frame_desc[j].offset = k;
