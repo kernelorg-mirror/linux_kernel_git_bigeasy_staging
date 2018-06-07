@@ -753,7 +753,6 @@ static struct urb *request_single_step_set_feature_urb(
 	if (!urb)
 		return NULL;
 
-	urb->pipe = usb_rcvctrlpipe(udev, 0);
 	ep = (usb_pipein(urb->pipe) ? udev->ep_in : udev->ep_out)
 				[usb_pipeendpoint(urb->pipe)];
 	if (!ep) {
@@ -761,14 +760,12 @@ static struct urb *request_single_step_set_feature_urb(
 		return NULL;
 	}
 
+	usb_fill_control_urb(urb, udev, usb_rcvctrlpipe(udev, 0),
+			     dr, buf, USB_DT_DEVICE_SIZE, usb_ehset_completion,
+			     done);
+
 	urb->ep = ep;
-	urb->dev = udev;
-	urb->setup_packet = (void *)dr;
-	urb->transfer_buffer = buf;
-	urb->transfer_buffer_length = USB_DT_DEVICE_SIZE;
-	urb->complete = usb_ehset_completion;
 	urb->status = -EINPROGRESS;
-	urb->actual_length = 0;
 	urb->transfer_flags = URB_DIR_IN;
 	usb_get_urb(urb);
 	atomic_inc(&urb->use_count);
@@ -783,7 +780,6 @@ static struct urb *request_single_step_set_feature_urb(
 			urb->transfer_buffer,
 			urb->transfer_buffer_length,
 			DMA_FROM_DEVICE);
-	urb->context = done;
 	return urb;
 }
 
