@@ -657,7 +657,7 @@ int cpia2_usb_transfer_cmd(struct camera_data *cam,
 static int submit_urbs(struct camera_data *cam)
 {
 	struct urb *urb;
-	int fx, err, i, j;
+	int err, i, j;
 
 	for(i=0; i<NUM_SBUF; ++i) {
 		if (cam->sbuf[i].data)
@@ -689,22 +689,12 @@ static int submit_urbs(struct camera_data *cam)
 		}
 
 		cam->sbuf[i].urb = urb;
-		urb->dev = cam->dev;
+		usb_fill_iso_urb(urb, cam->dev, usb_rcvisocpipe(cam->dev, 1),
+				 cam->sbuf[i].data, FRAME_SIZE_PER_DESC *
+				 FRAMES_PER_DESC, cpia2_usb_complete, cam, 1,
+				 FRAMES_PER_DESC, FRAME_SIZE_PER_DESC);
 		urb->context = cam;
-		urb->pipe = usb_rcvisocpipe(cam->dev, 1 /*ISOC endpoint*/);
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->transfer_buffer = cam->sbuf[i].data;
-		urb->complete = cpia2_usb_complete;
-		urb->number_of_packets = FRAMES_PER_DESC;
-		urb->interval = 1;
-		urb->transfer_buffer_length =
-			FRAME_SIZE_PER_DESC * FRAMES_PER_DESC;
-
-		for (fx = 0; fx < FRAMES_PER_DESC; fx++) {
-			urb->iso_frame_desc[fx].offset =
-				FRAME_SIZE_PER_DESC * fx;
-			urb->iso_frame_desc[fx].length = FRAME_SIZE_PER_DESC;
-		}
 	}
 
 
