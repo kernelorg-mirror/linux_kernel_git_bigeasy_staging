@@ -257,10 +257,6 @@ static int ttusbir_probe(struct usb_interface *intf,
 			goto out;
 		}
 
-		urb->dev = tt->udev;
-		urb->context = tt;
-		urb->pipe = usb_rcvisocpipe(tt->udev, tt->iso_in_endp);
-		urb->interval = 1;
 		buffer = usb_alloc_coherent(tt->udev, 128, GFP_KERNEL,
 						&urb->transfer_dma);
 		if (!buffer) {
@@ -268,11 +264,11 @@ static int ttusbir_probe(struct usb_interface *intf,
 			ret = -ENOMEM;
 			goto out;
 		}
+		usb_fill_int_urb(urb, tt->udev,
+				 usb_rcvisocpipe(tt->udev, tt->iso_in_endp),
+				 buffer, 128, ttusbir_urb_complete, tt, 1);
 		urb->transfer_flags = URB_NO_TRANSFER_DMA_MAP | URB_ISO_ASAP;
-		urb->transfer_buffer = buffer;
-		urb->complete = ttusbir_urb_complete;
 		urb->number_of_packets = 8;
-		urb->transfer_buffer_length = 128;
 
 		for (j = 0; j < 8; j++) {
 			urb->iso_frame_desc[j].offset = j * 16;
