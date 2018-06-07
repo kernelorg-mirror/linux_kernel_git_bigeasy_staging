@@ -203,6 +203,8 @@ static int sd_start(struct gspca_dev *gspca_dev)
 #endif
 #define SD_NPKT 32
 	for (n = 0; n < 4; n++) {
+		void *buf;
+
 		i = n & 1 ? 0 : 1;
 		packet_size =
 			le16_to_cpu(alt->endpoint[i].desc.wMaxPacketSize);
@@ -210,24 +212,21 @@ static int sd_start(struct gspca_dev *gspca_dev)
 		if (!urb)
 			return -ENOMEM;
 		gspca_dev->urb[n] = urb;
-		urb->transfer_buffer = usb_alloc_coherent(gspca_dev->dev,
-						packet_size * SD_NPKT,
-						GFP_KERNEL,
-						&urb->transfer_dma);
-		if (urb->transfer_buffer == NULL) {
+		buf = usb_alloc_coherent(gspca_dev->dev, packet_size * SD_NPKT,
+					 GFP_KERNEL, &urb->transfer_dma);
+		if (buf == NULL) {
 			pr_err("usb_buffer_alloc failed\n");
 			return -ENOMEM;
 		}
 
-		urb->dev = gspca_dev->dev;
-		urb->context = gspca_dev;
-		urb->transfer_buffer_length = packet_size * SD_NPKT;
-		urb->pipe = usb_rcvisocpipe(gspca_dev->dev,
-					n & 1 ? 0x81 : 0x82);
+		usb_fill_int_urb(urb, gspca_dev->dev,
+				 usb_rcvisocpipe(gspca_dev->dev,
+						 n & 1 ? 0x81 : 0x82),
+				 buf, packet_size * SD_NPKT, sd_isoc_irq,
+				 gspca_dev, 1);
+
 		urb->transfer_flags = URB_ISO_ASAP
 					| URB_NO_TRANSFER_DMA_MAP;
-		urb->interval = 1;
-		urb->complete = sd_isoc_irq;
 		urb->number_of_packets = SD_NPKT;
 		for (i = 0; i < SD_NPKT; i++) {
 			urb->iso_frame_desc[i].length = packet_size;
