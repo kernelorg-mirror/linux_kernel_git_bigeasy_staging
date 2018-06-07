@@ -280,7 +280,8 @@ static int cx231xx_init_audio_isoc(struct cx231xx *dev)
 
 	for (i = 0; i < CX231XX_AUDIO_BUFS; i++) {
 		struct urb *urb;
-		int j, k;
+		int j;
+		unsigned int pipe;
 
 		dev->adev.transfer_buffer[i] = kmalloc(sb_size, GFP_ATOMIC);
 		if (!dev->adev.transfer_buffer[i])
@@ -295,23 +296,14 @@ static int cx231xx_init_audio_isoc(struct cx231xx *dev)
 			}
 			return -ENOMEM;
 		}
-
-		urb->dev = dev->udev;
-		urb->context = dev;
-		urb->pipe = usb_rcvisocpipe(dev->udev,
-						dev->adev.end_point_addr);
+		pipe = usb_rcvisocpipe(dev->udev, dev->adev.end_point_addr);
+		usb_fill_iso_urb(urb, dev->udev, pipe,
+				 dev->adev.transfer_buffer[i], sb_size,
+				 cx231xx_audio_isocirq, dev, 1,
+				 CX231XX_ISO_NUM_AUDIO_PACKETS,
+				 dev->adev.max_pkt_size);
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->transfer_buffer = dev->adev.transfer_buffer[i];
-		urb->interval = 1;
-		urb->complete = cx231xx_audio_isocirq;
-		urb->number_of_packets = CX231XX_ISO_NUM_AUDIO_PACKETS;
-		urb->transfer_buffer_length = sb_size;
 
-		for (j = k = 0; j < CX231XX_ISO_NUM_AUDIO_PACKETS;
-			j++, k += dev->adev.max_pkt_size) {
-			urb->iso_frame_desc[j].offset = k;
-			urb->iso_frame_desc[j].length = dev->adev.max_pkt_size;
-		}
 		dev->adev.urb[i] = urb;
 	}
 
@@ -356,18 +348,12 @@ static int cx231xx_init_audio_bulk(struct cx231xx *dev)
 			}
 			return -ENOMEM;
 		}
-
-		urb->dev = dev->udev;
-		urb->context = dev;
-		urb->pipe = usb_rcvbulkpipe(dev->udev,
-						dev->adev.end_point_addr);
-		urb->transfer_flags = 0;
-		urb->transfer_buffer = dev->adev.transfer_buffer[i];
-		urb->complete = cx231xx_audio_bulkirq;
-		urb->transfer_buffer_length = sb_size;
-
+		usb_fill_bulk_urb(urb, dev->udev,
+				  usb_rcvbulkpipe(dev->udev,
+						  dev->adev.end_point_addr),
+				  dev->adev.transfer_buffer[i], sb_size,
+				  cx231xx_audio_bulkirq, dev);
 		dev->adev.urb[i] = urb;
-
 	}
 
 	for (i = 0; i < CX231XX_AUDIO_BUFS; i++) {
