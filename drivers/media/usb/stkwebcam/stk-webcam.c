@@ -460,14 +460,11 @@ static int stk_prepare_iso(struct stk_camera *dev)
 			usb_kill_urb(dev->isobufs[i].urb);
 			urb = dev->isobufs[i].urb;
 		}
-		urb->interval = 1;
-		urb->dev = udev;
-		urb->pipe = usb_rcvisocpipe(udev, dev->isoc_ep);
+		usb_fill_int_urb(urb, udev, usb_rcvisocpipe(udev, dev->isoc_ep),
+				 dev->isobufs[i].data, ISO_BUFFER_SIZE,
+				 stk_isoc_handler, dev, 1);
+
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->transfer_buffer = dev->isobufs[i].data;
-		urb->transfer_buffer_length = ISO_BUFFER_SIZE;
-		urb->complete = stk_isoc_handler;
-		urb->context = dev;
 		urb->start_frame = 0;
 		urb->number_of_packets = ISO_FRAMES_PER_DESC;
 
