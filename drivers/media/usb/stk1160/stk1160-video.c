@@ -481,13 +481,10 @@ int stk1160_alloc_isoc(struct stk1160 *dev)
 		/*
 		 * FIXME: Where can I get the endpoint?
 		 */
-		urb->dev = dev->udev;
-		urb->pipe = usb_rcvisocpipe(dev->udev, STK1160_EP_VIDEO);
-		urb->transfer_buffer = dev->isoc_ctl.transfer_buffer[i];
-		urb->transfer_buffer_length = sb_size;
-		urb->complete = stk1160_isoc_irq;
-		urb->context = dev;
-		urb->interval = 1;
+		usb_fill_int_urb(urb, dev->udev,
+				 usb_rcvisocpipe(dev->udev, STK1160_EP_VIDEO),
+				 dev->isoc_ctl.transfer_buffer[i], sb_size,
+				 stk1160_isoc_irq, dev, 1);
 		urb->start_frame = 0;
 		urb->number_of_packets = max_packets;
 #ifndef CONFIG_DMA_NONCOHERENT
