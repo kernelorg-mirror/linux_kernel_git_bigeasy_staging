@@ -495,7 +495,7 @@ static void msi2500_isoc_cleanup(struct msi2500_dev *dev)
 static int msi2500_isoc_init(struct msi2500_dev *dev)
 {
 	struct urb *urb;
-	int i, j, ret;
+	int i, ret;
 
 	dev_dbg(dev->dev, "\n");
 
@@ -507,6 +507,8 @@ static int msi2500_isoc_init(struct msi2500_dev *dev)
 
 	/* Allocate and init Isochronuous urbs */
 	for (i = 0; i < MAX_ISO_BUFS; i++) {
+		void *buf;
+
 		urb = usb_alloc_urb(ISO_FRAMES_PER_DESC, GFP_KERNEL);
 		if (urb == NULL) {
 			msi2500_isoc_cleanup(dev);
@@ -515,28 +517,21 @@ static int msi2500_isoc_init(struct msi2500_dev *dev)
 		dev->urbs[i] = urb;
 		dev_dbg(dev->dev, "Allocated URB at 0x%p\n", urb);
 
-		urb->interval = 1;
-		urb->dev = dev->udev;
-		urb->pipe = usb_rcvisocpipe(dev->udev, 0x81);
-		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-		urb->transfer_buffer = usb_alloc_coherent(dev->udev,
-				ISO_BUFFER_SIZE,
-				GFP_KERNEL, &urb->transfer_dma);
-		if (urb->transfer_buffer == NULL) {
+
+		buf = usb_alloc_coherent(dev->udev, ISO_BUFFER_SIZE, GFP_KERNEL,
+					 &urb->transfer_dma);
+		if (buf == NULL) {
 			dev_err(dev->dev,
 				"Failed to allocate urb buffer %d\n", i);
 			msi2500_isoc_cleanup(dev);
 			return -ENOMEM;
 		}
-		urb->transfer_buffer_length = ISO_BUFFER_SIZE;
-		urb->complete = msi2500_isoc_handler;
-		urb->context = dev;
+		usb_fill_iso_urb(urb, dev->udev,
+				 usb_rcvisocpipe(dev->udev, 0x81), buf,
+				 ISO_BUFFER_SIZE, msi2500_isoc_handler, dev, 1,
+				 ISO_FRAMES_PER_DESC, ISO_MAX_FRAME_SIZE);
+		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
 		urb->start_frame = 0;
-		urb->number_of_packets = ISO_FRAMES_PER_DESC;
-		for (j = 0; j < ISO_FRAMES_PER_DESC; j++) {
-			urb->iso_frame_desc[j].offset = j * ISO_MAX_FRAME_SIZE;
-			urb->iso_frame_desc[j].length = ISO_MAX_FRAME_SIZE;
-		}
 	}
 
 	/* link */
