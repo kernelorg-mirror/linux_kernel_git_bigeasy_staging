@@ -1619,21 +1619,19 @@ static int uvc_init_video_isoc(struct uvc_streaming *stream,
 			return -ENOMEM;
 		}
 
-		urb->dev = stream->dev->udev;
-		urb->context = stream;
-		urb->pipe = usb_rcvisocpipe(stream->dev->udev,
-				ep->desc.bEndpointAddress);
+		usb_fill_int_urb(urb, stream->dev->udev,
+				 usb_rcvisocpipe(stream->dev->udev,
+						 ep->desc.bEndpointAddress),
+				 stream->urb_buffer[i], size,
+				 uvc_video_complete, stream,
+				 ep->desc.bInterval);
 #ifndef CONFIG_DMA_NONCOHERENT
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
 		urb->transfer_dma = stream->urb_dma[i];
 #else
 		urb->transfer_flags = URB_ISO_ASAP;
 #endif
-		urb->interval = ep->desc.bInterval;
-		urb->transfer_buffer = stream->urb_buffer[i];
-		urb->complete = uvc_video_complete;
 		urb->number_of_packets = npackets;
-		urb->transfer_buffer_length = size;
 
 		for (j = 0; j < npackets; ++j) {
 			urb->iso_frame_desc[j].offset = j * psize;
