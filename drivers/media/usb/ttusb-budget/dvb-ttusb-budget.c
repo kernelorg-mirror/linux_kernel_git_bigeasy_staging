@@ -831,7 +831,7 @@ static void ttusb_stop_iso_xfer(struct ttusb *ttusb)
 
 static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 {
-	int i, j, err, buffer_offset = 0;
+	int i, err, buffer_offset = 0;
 
 	if (ttusb->iso_streaming) {
 		printk("%s: iso xfer already running!\n", __func__);
@@ -843,26 +843,15 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 	ttusb->mux_state = 0;
 
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
-		int frame_offset = 0;
 		struct urb *urb = ttusb->iso_urb[i];
 
-		urb->dev = ttusb->dev;
-		urb->context = ttusb;
-		urb->complete = ttusb_iso_irq;
-		urb->pipe = ttusb->isoc_in_pipe;
+		usb_fill_iso_urb(urb, ttusb->dev, ttusb->isoc_in_pipe,
+				 ttusb->iso_buffer + buffer_offset,
+				 ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF,
+				 ttusb_iso_irq, ttusb, 1, FRAMES_PER_ISO_BUF,
+				 ISO_FRAME_SIZE);
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->interval = 1;
-		urb->number_of_packets = FRAMES_PER_ISO_BUF;
-		urb->transfer_buffer_length =
-		    ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF;
-		urb->transfer_buffer = ttusb->iso_buffer + buffer_offset;
 		buffer_offset += ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF;
-
-		for (j = 0; j < FRAMES_PER_ISO_BUF; j++) {
-			urb->iso_frame_desc[j].offset = frame_offset;
-			urb->iso_frame_desc[j].length = ISO_FRAME_SIZE;
-			frame_offset += ISO_FRAME_SIZE;
-		}
 	}
 
 	for (i = 0; i < ISO_BUF_COUNT; i++) {
