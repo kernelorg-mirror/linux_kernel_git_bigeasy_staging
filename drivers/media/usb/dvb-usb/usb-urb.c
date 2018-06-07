@@ -187,16 +187,14 @@ static int usb_isoc_urb_init(struct usb_data_stream *stream)
 		}
 
 		urb = stream->urb_list[i];
-
-		urb->dev = stream->udev;
-		urb->context = stream;
-		urb->complete = usb_urb_complete;
-		urb->pipe = usb_rcvisocpipe(stream->udev,stream->props.endpoint);
+		usb_fill_int_urb(urb, stream->udev,
+				 usb_rcvisocpipe(stream->udev,
+						 stream->props.endpoint),
+				 stream->buf_list[i], stream->buf_size,
+				 usb_urb_complete, stream,
+				 stream->props.u.isoc.interval);
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-		urb->interval = stream->props.u.isoc.interval;
 		urb->number_of_packets = stream->props.u.isoc.framesperurb;
-		urb->transfer_buffer_length = stream->buf_size;
-		urb->transfer_buffer = stream->buf_list[i];
 		urb->transfer_dma = stream->dma_addr[i];
 
 		for (j = 0; j < stream->props.u.isoc.framesperurb; j++) {
