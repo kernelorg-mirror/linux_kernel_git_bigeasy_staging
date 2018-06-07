@@ -496,26 +496,24 @@ static struct urb *usbtv_setup_iso_transfer(struct usbtv *usbtv)
 {
 	struct urb *ip;
 	int size = usbtv->iso_size;
+	void *buf;
 	int i;
 
 	ip = usb_alloc_urb(USBTV_ISOC_PACKETS, GFP_KERNEL);
 	if (ip == NULL)
 		return NULL;
 
-	ip->dev = usbtv->udev;
-	ip->context = usbtv;
-	ip->pipe = usb_rcvisocpipe(usbtv->udev, USBTV_VIDEO_ENDP);
-	ip->interval = 1;
-	ip->transfer_flags = URB_ISO_ASAP;
-	ip->transfer_buffer = kcalloc(USBTV_ISOC_PACKETS, size,
-						GFP_KERNEL);
-	if (!ip->transfer_buffer) {
+	buf = kcalloc(USBTV_ISOC_PACKETS, size, GFP_KERNEL);
+	if (!buf) {
 		usb_free_urb(ip);
 		return NULL;
 	}
-	ip->complete = usbtv_iso_cb;
+	usb_fill_int_urb(ip, usbtv->udev,
+			 usb_rcvisocpipe(usbtv->udev, USBTV_VIDEO_ENDP),
+			 buf, size * USBTV_ISOC_PACKETS, usbtv_iso_cb,
+			 usbtv, 1);
+	ip->transfer_flags = URB_ISO_ASAP;
 	ip->number_of_packets = USBTV_ISOC_PACKETS;
-	ip->transfer_buffer_length = size * USBTV_ISOC_PACKETS;
 	for (i = 0; i < USBTV_ISOC_PACKETS; i++) {
 		ip->iso_frame_desc[i].offset = size * i;
 		ip->iso_frame_desc[i].length = size;
