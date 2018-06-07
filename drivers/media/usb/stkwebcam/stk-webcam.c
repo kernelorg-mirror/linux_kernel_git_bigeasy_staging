@@ -423,7 +423,7 @@ resubmit:
 static int stk_prepare_iso(struct stk_camera *dev)
 {
 	void *kbuf;
-	int i, j;
+	int i;
 	struct urb *urb;
 	struct usb_device *udev;
 
@@ -460,21 +460,12 @@ static int stk_prepare_iso(struct stk_camera *dev)
 			usb_kill_urb(dev->isobufs[i].urb);
 			urb = dev->isobufs[i].urb;
 		}
-		urb->interval = 1;
-		urb->dev = udev;
-		urb->pipe = usb_rcvisocpipe(udev, dev->isoc_ep);
-		urb->transfer_flags = URB_ISO_ASAP;
-		urb->transfer_buffer = dev->isobufs[i].data;
-		urb->transfer_buffer_length = ISO_BUFFER_SIZE;
-		urb->complete = stk_isoc_handler;
-		urb->context = dev;
-		urb->start_frame = 0;
-		urb->number_of_packets = ISO_FRAMES_PER_DESC;
+		usb_fill_iso_urb(urb, udev, usb_rcvisocpipe(udev, dev->isoc_ep),
+				 dev->isobufs[i].data, ISO_BUFFER_SIZE,
+				 stk_isoc_handler, dev, 1, ISO_FRAMES_PER_DESC,
+				 ISO_MAX_FRAME_SIZE);
 
-		for (j = 0; j < ISO_FRAMES_PER_DESC; j++) {
-			urb->iso_frame_desc[j].offset = j * ISO_MAX_FRAME_SIZE;
-			urb->iso_frame_desc[j].length = ISO_MAX_FRAME_SIZE;
-		}
+		urb->transfer_flags = URB_ISO_ASAP;
 	}
 	set_memallocd(dev);
 	return 0;
