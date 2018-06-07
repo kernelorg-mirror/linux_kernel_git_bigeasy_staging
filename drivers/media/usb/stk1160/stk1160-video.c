@@ -421,7 +421,7 @@ void stk1160_uninit_isoc(struct stk1160 *dev)
 int stk1160_alloc_isoc(struct stk1160 *dev)
 {
 	struct urb *urb;
-	int i, j, k, sb_size, max_packets, num_bufs;
+	int i, sb_size, max_packets, num_bufs;
 
 	/*
 	 * It may be necessary to release isoc here,
@@ -481,28 +481,16 @@ int stk1160_alloc_isoc(struct stk1160 *dev)
 		/*
 		 * FIXME: Where can I get the endpoint?
 		 */
-		urb->dev = dev->udev;
-		urb->pipe = usb_rcvisocpipe(dev->udev, STK1160_EP_VIDEO);
-		urb->transfer_buffer = dev->isoc_ctl.transfer_buffer[i];
-		urb->transfer_buffer_length = sb_size;
-		urb->complete = stk1160_isoc_irq;
-		urb->context = dev;
-		urb->interval = 1;
-		urb->start_frame = 0;
-		urb->number_of_packets = max_packets;
+		usb_fill_iso_urb(urb, dev->udev,
+				 usb_rcvisocpipe(dev->udev, STK1160_EP_VIDEO),
+				 dev->isoc_ctl.transfer_buffer[i], sb_size,
+				 stk1160_isoc_irq, dev, 1, max_packets,
+				 dev->isoc_ctl.max_pkt_size);
 #ifndef CONFIG_DMA_NONCOHERENT
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
 #else
 		urb->transfer_flags = URB_ISO_ASAP;
 #endif
-
-		k = 0;
-		for (j = 0; j < max_packets; j++) {
-			urb->iso_frame_desc[j].offset = k;
-			urb->iso_frame_desc[j].length =
-					dev->isoc_ctl.max_pkt_size;
-			k += dev->isoc_ctl.max_pkt_size;
-		}
 	}
 
 	stk1160_dbg("%d urbs allocated\n", num_bufs);
