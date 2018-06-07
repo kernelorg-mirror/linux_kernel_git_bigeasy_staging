@@ -168,7 +168,7 @@ static int usb_urb_alloc_isoc_urbs(struct usb_data_stream *stream)
 	/* allocate the URBs */
 	for (i = 0; i < stream->props.count; i++) {
 		struct urb *urb;
-		int frame_offset = 0;
+
 		dev_dbg(&stream->udev->dev, "%s: alloc urb=%d\n", __func__, i);
 		stream->urb_list[i] = usb_alloc_urb(
 				stream->props.u.isoc.framesperurb, GFP_ATOMIC);
@@ -180,25 +180,18 @@ static int usb_urb_alloc_isoc_urbs(struct usb_data_stream *stream)
 		}
 
 		urb = stream->urb_list[i];
+		usb_fill_iso_urb(urb, stream->udev,
+				 usb_rcvisocpipe(stream->udev,
+						 stream->props.endpoint),
+				 stream->buf_list[i],
+				 stream->props.u.isoc.framesize *
+				 stream->props.u.isoc.framesperurb,
+				 usb_urb_complete, stream,
+				 stream->props.u.isoc.interval,
+				 stream->props.u.isoc.framesperurb,
+				 stream->props.u.isoc.framesize);
 
-		urb->dev = stream->udev;
-		urb->context = stream;
-		urb->complete = usb_urb_complete;
-		urb->pipe = usb_rcvisocpipe(stream->udev,
-				stream->props.endpoint);
 		urb->transfer_flags = URB_ISO_ASAP | URB_FREE_BUFFER;
-		urb->interval = stream->props.u.isoc.interval;
-		urb->number_of_packets = stream->props.u.isoc.framesperurb;
-		urb->transfer_buffer_length = stream->props.u.isoc.framesize *
-				stream->props.u.isoc.framesperurb;
-		urb->transfer_buffer = stream->buf_list[i];
-
-		for (j = 0; j < stream->props.u.isoc.framesperurb; j++) {
-			urb->iso_frame_desc[j].offset = frame_offset;
-			urb->iso_frame_desc[j].length =
-					stream->props.u.isoc.framesize;
-			frame_offset += stream->props.u.isoc.framesize;
-		}
 
 		stream->urbs_initialized++;
 	}
