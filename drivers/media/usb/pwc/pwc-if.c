@@ -409,6 +409,8 @@ retry:
 
 	/* Allocate and init Isochronuous urbs */
 	for (i = 0; i < MAX_ISO_BUFS; i++) {
+		void *buf;
+
 		urb = usb_alloc_urb(ISO_FRAMES_PER_DESC, GFP_KERNEL);
 		if (urb == NULL) {
 			pwc_isoc_cleanup(pdev);
@@ -416,23 +418,18 @@ retry:
 		}
 		pdev->urbs[i] = urb;
 		PWC_DEBUG_MEMORY("Allocated URB at 0x%p\n", urb);
-
-		urb->interval = 1; // devik
-		urb->dev = udev;
-		urb->pipe = usb_rcvisocpipe(udev, pdev->vendpoint);
 		urb->transfer_flags = URB_ISO_ASAP | URB_NO_TRANSFER_DMA_MAP;
-		urb->transfer_buffer = usb_alloc_coherent(udev,
-							  ISO_BUFFER_SIZE,
-							  GFP_KERNEL,
-							  &urb->transfer_dma);
-		if (urb->transfer_buffer == NULL) {
+		buf = usb_alloc_coherent(udev, ISO_BUFFER_SIZE, GFP_KERNEL,
+					 &urb->transfer_dma);
+		if (buf == NULL) {
 			PWC_ERROR("Failed to allocate urb buffer %d\n", i);
 			pwc_isoc_cleanup(pdev);
 			return -ENOMEM;
 		}
-		urb->transfer_buffer_length = ISO_BUFFER_SIZE;
-		urb->complete = pwc_isoc_handler;
-		urb->context = pdev;
+		usb_fill_int_urb(urb, udev,
+			usb_rcvisocpipe(udev, pdev->vendpoint),
+			buf, ISO_BUFFER_SIZE, pwc_isoc_handler, pdev, 1);
+
 		urb->start_frame = 0;
 		urb->number_of_packets = ISO_FRAMES_PER_DESC;
 		for (j = 0; j < ISO_FRAMES_PER_DESC; j++) {
