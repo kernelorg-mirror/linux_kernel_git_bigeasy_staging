@@ -1437,7 +1437,8 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 	int i, ret, is_in, num_sgs = 0, ifnum = -1;
 	int number_of_packets = 0;
 	unsigned int stream_id = 0;
-	void *buf;
+	int pipe;
+	void *buf = NULL;
 	unsigned long mask =	USBDEVFS_URB_SHORT_NOT_OK |
 				USBDEVFS_URB_BULK_CONTINUATION |
 				USBDEVFS_URB_NO_FSBR |
@@ -1632,22 +1633,20 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 			}
 			totlen -= u;
 		}
+		buf = NULL;
 	} else if (uurb->buffer_length > 0) {
 		if (as->usbm) {
 			unsigned long uurb_start = (unsigned long)uurb->buffer;
 
-			as->urb->transfer_buffer = as->usbm->mem +
-					(uurb_start - as->usbm->vm_start);
+			buf = as->usbm->mem + (uurb_start - as->usbm->vm_start);
 		} else {
-			as->urb->transfer_buffer = kmalloc(uurb->buffer_length,
-					GFP_KERNEL);
-			if (!as->urb->transfer_buffer) {
+			buf = kmalloc(uurb->buffer_length, GFP_KERNEL);
+			if (!buf) {
 				ret = -ENOMEM;
 				goto error;
 			}
 			if (!is_in) {
-				if (copy_from_user(as->urb->transfer_buffer,
-						   uurb->buffer,
+				if (copy_from_user(buf, uurb->buffer,
 						   uurb->buffer_length)) {
 					ret = -EFAULT;
 					goto error;
@@ -1659,16 +1658,10 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 				 * short. Clear the buffer so that the gaps
 				 * don't leak kernel data to userspace.
 				 */
-				memset(as->urb->transfer_buffer, 0,
-						uurb->buffer_length);
+				memset(buf, 0, uurb->buffer_length);
 			}
 		}
 	}
-	as->urb->dev = ps->dev;
-	as->urb->pipe = (uurb->type << 30) |
-			__create_pipe(ps->dev, uurb->endpoint & 0xf) |
-			(uurb->endpoint & USB_DIR_IN);
-
 	/* This tedious sequence is necessary because the URB_* flags
 	 * are internal to the kernel and subject to change, whereas
 	 * the USBDEVFS_URB_* flags are a user API and must not be changed.
@@ -1684,25 +1677,31 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 		u |= URB_NO_INTERRUPT;
 	as->urb->transfer_flags = u;
 
-	as->urb->transfer_buffer_length = uurb->buffer_length;
-	as->urb->setup_packet = (unsigned char *)dr;
-	dr = NULL;
+	pipe = (uurb->type << 30) | (uurb->endpoint & USB_DIR_IN) |
+		__create_pipe(ps->dev, uurb->endpoint & 0xf);
+	switch (uurb->type) {
+	case USBDEVFS_URB_TYPE_CONTROL:
+		usb_fill_control_urb(as->urb, ps->dev, pipe, (u8 *)dr, buf,
+				     uurb->buffer_length, async_completed, as);
+		dr = NULL;
+		break;
+
+	case USBDEVFS_URB_TYPE_BULK:
+		usb_fill_bulk_urb(as->urb, ps->dev, pipe, buf,
+				  uurb->buffer_length, async_completed, as);
+		break;
+
+	case USBDEVFS_URB_TYPE_ISO:
+	case USBDEVFS_URB_TYPE_INTERRUPT:
+		usb_fill_int_urb(as->urb, ps->dev, pipe, buf,
+				 uurb->buffer_length, async_completed, as,
+				 ep->desc.bInterval);
+		break;
+	}
+	buf = NULL;
 	as->urb->start_frame = uurb->start_frame;
 	as->urb->number_of_packets = number_of_packets;
 	as->urb->stream_id = stream_id;
-
-	if (ep->desc.bInterval) {
-		if (uurb->type == USBDEVFS_URB_TYPE_ISO ||
-				ps->dev->speed == USB_SPEED_HIGH ||
-				ps->dev->speed >= USB_SPEED_SUPER)
-			as->urb->interval = 1 <<
-					min(15, ep->desc.bInterval - 1);
-		else
-			as->urb->interval = ep->desc.bInterval;
-	}
-
-	as->urb->context = as;
-	as->urb->complete = async_completed;
 
 	for (totlen = u = 0; u < number_of_packets; u++) {
 		as->urb->iso_frame_desc[u].offset = totlen;
@@ -1779,6 +1778,7 @@ static int proc_do_submiturb(struct usb_dev_state *ps, struct usbdevfs_urb *uurb
 		dec_usb_memory_use_count(as->usbm, &as->usbm->urb_use_count);
 	kfree(isopkt);
 	kfree(dr);
+	kfree(buf);
 	if (as)
 		free_async(as);
 	return ret;
