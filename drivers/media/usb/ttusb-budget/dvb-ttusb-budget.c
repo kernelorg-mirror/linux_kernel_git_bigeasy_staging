@@ -846,16 +846,12 @@ static int ttusb_start_iso_xfer(struct ttusb *ttusb)
 		int frame_offset = 0;
 		struct urb *urb = ttusb->iso_urb[i];
 
-		urb->dev = ttusb->dev;
-		urb->context = ttusb;
-		urb->complete = ttusb_iso_irq;
-		urb->pipe = ttusb->isoc_in_pipe;
+		usb_fill_int_urb(urb, ttusb->dev, ttusb->isoc_in_pipe,
+				 ttusb->iso_buffer + buffer_offset,
+				 ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF,
+				 ttusb_iso_irq, ttusb, 1);
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->interval = 1;
 		urb->number_of_packets = FRAMES_PER_ISO_BUF;
-		urb->transfer_buffer_length =
-		    ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF;
-		urb->transfer_buffer = ttusb->iso_buffer + buffer_offset;
 		buffer_offset += ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF;
 
 		for (j = 0; j < FRAMES_PER_ISO_BUF; j++) {
