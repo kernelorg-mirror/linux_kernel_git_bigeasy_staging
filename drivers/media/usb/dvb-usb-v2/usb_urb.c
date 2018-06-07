@@ -180,18 +180,17 @@ static int usb_urb_alloc_isoc_urbs(struct usb_data_stream *stream)
 		}
 
 		urb = stream->urb_list[i];
+		usb_fill_int_urb(urb, stream->udev,
+				 usb_rcvisocpipe(stream->udev,
+						 stream->props.endpoint),
+				 stream->buf_list[i],
+				 stream->props.u.isoc.framesize *
+				 stream->props.u.isoc.framesperurb,
+				 usb_urb_complete, stream,
+				 stream->props.u.isoc.interval);
 
-		urb->dev = stream->udev;
-		urb->context = stream;
-		urb->complete = usb_urb_complete;
-		urb->pipe = usb_rcvisocpipe(stream->udev,
-				stream->props.endpoint);
 		urb->transfer_flags = URB_ISO_ASAP | URB_FREE_BUFFER;
-		urb->interval = stream->props.u.isoc.interval;
 		urb->number_of_packets = stream->props.u.isoc.framesperurb;
-		urb->transfer_buffer_length = stream->props.u.isoc.framesize *
-				stream->props.u.isoc.framesperurb;
-		urb->transfer_buffer = stream->buf_list[i];
 
 		for (j = 0; j < stream->props.u.isoc.framesperurb; j++) {
 			urb->iso_frame_desc[j].offset = frame_offset;
