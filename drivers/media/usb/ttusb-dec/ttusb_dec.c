@@ -858,16 +858,13 @@ static void ttusb_dec_setup_urbs(struct ttusb_dec *dec)
 		int frame_offset = 0;
 		struct urb *urb = dec->iso_urb[i];
 
-		urb->dev = dec->udev;
-		urb->context = dec;
-		urb->complete = ttusb_dec_process_urb;
-		urb->pipe = dec->in_pipe;
+		usb_fill_int_urb(urb, dec->udev, dec->in_pipe,
+				 dec->iso_buffer + buffer_offset,
+				 ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF,
+				 ttusb_dec_process_urb, dec, 1);
+
 		urb->transfer_flags = URB_ISO_ASAP;
-		urb->interval = 1;
 		urb->number_of_packets = FRAMES_PER_ISO_BUF;
-		urb->transfer_buffer_length = ISO_FRAME_SIZE *
-					      FRAMES_PER_ISO_BUF;
-		urb->transfer_buffer = dec->iso_buffer + buffer_offset;
 		buffer_offset += ISO_FRAME_SIZE * FRAMES_PER_ISO_BUF;
 
 		for (j = 0; j < FRAMES_PER_ISO_BUF; j++) {
