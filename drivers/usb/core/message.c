@@ -400,6 +400,7 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 
 	for_each_sg(sg, sg, io->entries, i) {
 		struct urb *urb;
+		void *buf = NULL;
 		unsigned len;
 
 		urb = usb_alloc_urb(0, mem_flags);
@@ -409,17 +410,11 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 		}
 		io->urbs[i] = urb;
 
-		urb->dev = NULL;
-		urb->pipe = pipe;
-		urb->interval = period;
 		urb->transfer_flags = urb_flags;
-		urb->complete = sg_complete;
-		urb->context = io;
 		urb->sg = sg;
 
 		if (use_sg) {
 			/* There is no single transfer buffer */
-			urb->transfer_buffer = NULL;
 			urb->num_sgs = nents;
 
 			/* A length of zero means transfer the whole sg list */
@@ -439,8 +434,6 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 			 */
 			if (!PageHighMem(sg_page(sg)))
 				urb->transfer_buffer = sg_virt(sg);
-			else
-				urb->transfer_buffer = NULL;
 
 			len = sg->length;
 			if (length) {
@@ -450,7 +443,8 @@ int usb_sg_init(struct usb_sg_request *io, struct usb_device *dev,
 					io->entries = i + 1;
 			}
 		}
-		urb->transfer_buffer_length = len;
+		usb_fill_bulk_urb(urb, dev, pipe, buf, len, sg_complete, io);
+		urb->interval = period;
 	}
 	io->urbs[--i]->transfer_flags &= ~URB_NO_INTERRUPT;
 
