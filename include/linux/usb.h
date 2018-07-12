@@ -1697,6 +1697,66 @@ static inline void usb_fill_int_urb(struct urb *urb,
 	urb->start_frame = -1;
 }
 
+/**
+ * usb_fill_iso_urb - initializes an isochronous urb
+ * @urb: pointer to the urb to initialize.
+ * @dev: pointer to the struct usb_device for this urb.
+ * @pipe: the endpoint pipe
+ * @transfer_buffer: pointer to the transfer buffer
+ * @buffer_length: length of the transfer buffer
+ * @complete_fn: pointer to the usb_complete_t function
+ * @context: what to set the urb context to.
+ * @interval: what to set the urb interval to, encoded like
+ *	the endpoint descriptor's bInterval value.
+ * @packets: number of ISO packets.
+ * @packet_size: size of each ISO packet.
+ *
+ * Initializes an isochronous urb with the proper information needed to submit
+ * it to a device.
+ *
+ * Full-speed devices express polling intervals in frames (1 per ms);
+ * high-speed and SuperSpeed devices express polling intervals in
+ * microframes (8 per ms).
+ *
+ * The arguments @packets is to initialize number_of_packets member of struct
+ * usb. If @packets and @packet_size is non zero then the iso_frame_desc array
+ * will be initialized and each packet will have the same size.
+ */
+static inline void usb_fill_iso_urb(struct urb *urb,
+				    struct usb_device *dev,
+				    unsigned int pipe,
+				    void *transfer_buffer,
+				    int buffer_length,
+				    usb_complete_t complete_fn,
+				    void *context,
+				    int interval,
+				    unsigned int packets,
+				    unsigned int packet_size)
+{
+	unsigned int i;
+
+	urb->dev = dev;
+	urb->pipe = pipe;
+	urb->transfer_buffer = transfer_buffer;
+	urb->transfer_buffer_length = buffer_length;
+	urb->complete = complete_fn;
+	urb->context = context;
+
+	interval = clamp(interval, 1, 16);
+	urb->interval = 1 << (interval - 1);
+	urb->start_frame = -1;
+
+	if (packets)
+		urb->number_of_packets = packets;
+
+	if (packet_size) {
+		for (i = 0; i < packets; i++) {
+			urb->iso_frame_desc[i].offset = packet_size * i;
+			urb->iso_frame_desc[i].length = packet_size;
+		}
+	}
+}
+
 extern void usb_init_urb(struct urb *urb);
 extern struct urb *usb_alloc_urb(int iso_packets, gfp_t mem_flags);
 extern void usb_free_urb(struct urb *urb);
