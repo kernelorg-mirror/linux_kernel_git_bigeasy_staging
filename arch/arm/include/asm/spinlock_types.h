@@ -29,6 +29,6 @@ typedef struct {
 	u32 lock;
 } arch_rwlock_t;
 
-#define __ARCH_RW_LOCK_UNLOCKED		{ 0 }
+#include <asm-generic/qrwlock_types.h>
 
 #endif
