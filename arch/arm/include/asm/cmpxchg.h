@@ -181,6 +181,16 @@ static inline unsigned long long __cmpxchg64(unsigned long long *ptr,
 #define swp_is_buggy
 #endif
 
+#ifdef CONFIG_CPU_V6
+static inline unsigned int __cmpxchg_u32(volatile void *ptr, unsigned int old,
+					 unsigned int new)
+{
+	return __cmpxchg(ptr, old, new, sizeof(unsigned int));
+}
+
+#include <asm-generic/cmpxchg-xchg.h>
+#endif
+
 static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
 {
 	extern void __bad_xchg(volatile void *, int);
@@ -196,7 +206,15 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
 
 	switch (size) {
 #if __LINUX_ARM_ARCH__ >= 6
-#ifndef CONFIG_CPU_V6 /* MIN ARCH >= V6K */
+#ifdef CONFIG_CPU_V6
+	case 1:
+		ret = xchg_u8(ptr, x);
+		break;
+	case 2:
+		ret = xchg_u16(ptr, x);
+		break;
+
+#else /* MIN ARCH >= V6K */
 	case 1:
 		asm volatile("@	__xchg1\n"
 		"1:	ldrexb	%0, [%3]\n"
