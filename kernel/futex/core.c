@@ -1314,7 +1314,6 @@ static void compat_exit_robust_list(struct task_struct *curr)
 }
 #endif
 
-#ifdef CONFIG_FUTEX_PI
 
 /*
  * This task is holding PI mutexes at exit time => bad.
@@ -1401,9 +1400,6 @@ static void exit_pi_state_list(struct task_struct *curr)
 	}
 	raw_spin_unlock_irq(&curr->pi_lock);
 }
-#else
-static inline void exit_pi_state_list(struct task_struct *curr) { }
-#endif
 
 static void futex_cleanup(struct task_struct *tsk)
 {

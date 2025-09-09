@@ -387,15 +387,6 @@ int futex_requeue(u32 __user *uaddr1, unsigned int flags1,
 	if (nr_wake < 0 || nr_requeue < 0)
 		return -EINVAL;
 
-	/*
-	 * When PI not supported: return -ENOSYS if requeue_pi is true,
-	 * consequently the compiler knows requeue_pi is always false past
-	 * this point which will optimize away all the conditional code
-	 * further down.
-	 */
-	if (!IS_ENABLED(CONFIG_FUTEX_PI) && requeue_pi)
-		return -ENOSYS;
-
 	if (requeue_pi) {
 		/*
 		 * Requeue PI only works on two distinct uaddrs. This
@@ -784,9 +775,6 @@ int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 	struct futex_q q = futex_q_init;
 	struct rt_mutex_base *pi_mutex;
 	int res, ret;
-
-	if (!IS_ENABLED(CONFIG_FUTEX_PI))
-		return -ENOSYS;
 
 	if (uaddr == uaddr2)
 		return -EINVAL;
