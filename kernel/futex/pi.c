@@ -994,9 +994,6 @@ int futex_lock_pi(u32 __user *uaddr, unsigned int flags, ktime_t *time, int tryl
 	DEFINE_WAKE_Q(wake_q);
 	int res, ret;
 
-	if (!IS_ENABLED(CONFIG_FUTEX_PI))
-		return -ENOSYS;
-
 	if (refill_pi_state_cache())
 		return -ENOMEM;
 
@@ -1200,8 +1197,6 @@ static int __futex_unlock_pi(u32 __user *uaddr, unsigned int flags)
 	struct futex_q *top_waiter;
 	int ret;
 
-	if (!IS_ENABLED(CONFIG_FUTEX_PI))
-		return -ENOSYS;
 retry:
 	if (get_user(uval, uaddr))
 		return -EFAULT;
