@@ -451,6 +451,14 @@ static int handle_bug_opcode(unsigned int instr, struct pt_regs *regs)
 	if (bug_type == BUG_TRAP_TYPE_NONE)
 		return 0;
 
+	if (bug_type == BUG_TRAP_TYPE_WARN) {
+		if (IS_ENABLED(CONFIG_THUMB2_KERNEL))
+			regs->ARM_pc += 2;
+		else
+			regs->ARM_pc += 4;
+		return 1;
+	}
+
 	flags = oops_begin();
 	if (__die("Oops - BUG", 0, regs))
 		sig = 0;
