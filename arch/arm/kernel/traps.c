@@ -355,14 +355,10 @@ static void oops_end(unsigned long flags, struct pt_regs *regs, int signr)
  */
 void die(const char *str, struct pt_regs *regs, int err)
 {
-	enum bug_trap_type bug_type = BUG_TRAP_TYPE_NONE;
-	unsigned long flags = oops_begin();
+	unsigned long flags;
 	int sig = SIGSEGV;
 
-	if (!user_mode(regs))
-		bug_type = report_bug(regs->ARM_pc, regs);
-	if (bug_type != BUG_TRAP_TYPE_NONE)
-		str = "Oops - BUG";
+	flags = oops_begin();
 
 	if (__die(str, err, regs))
 		sig = 0;
@@ -442,6 +438,26 @@ int call_undef_hook(struct pt_regs *regs, unsigned int instr)
 	return fn ? fn(regs, instr) : 1;
 }
 
+static int handle_bug_opcode(unsigned int instr, struct pt_regs *regs)
+{
+	enum bug_trap_type bug_type;
+	unsigned long flags;
+	int sig = SIGSEGV;
+
+	if (instr != BUG_INSTR_VALUE)
+		return 0;
+
+	bug_type = report_bug(regs->ARM_pc, regs);
+	if (bug_type == BUG_TRAP_TYPE_NONE)
+		return 0;
+
+	flags = oops_begin();
+	if (__die("Oops - BUG", 0, regs))
+		sig = 0;
+	oops_end(flags, regs, sig);
+	return 1;
+}
+
 asmlinkage void do_undefinstr(struct pt_regs *regs)
 {
 	unsigned int instr;
@@ -461,6 +477,10 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 		} else
 #endif
 			instr = __mem_to_opcode_arm(*(u32 *) pc);
+
+		if (handle_bug_opcode(instr, regs))
+			return;
+
 	} else if (thumb_mode(regs)) {
 		if (get_user(instr, (u16 __user *)pc))
 			goto die_sig;
