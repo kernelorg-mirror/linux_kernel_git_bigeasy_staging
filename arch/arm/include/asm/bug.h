@@ -13,11 +13,9 @@
  */
 #ifdef CONFIG_THUMB2_KERNEL
 #define BUG_INSTR_VALUE 0xde02
-#define BUG_INSTR(__value) __inst_thumb16(__value)
 #define BUG_ENCODING() .short ___asm_opcode_to_mem_thumb16(BUG_INSTR_VALUE)
 #else
 #define BUG_INSTR_VALUE 0xe7f001f2
-#define BUG_INSTR(__value) __inst_arm(__value)
 #define BUG_ENCODING() .long ___asm_opcode_to_mem_arm(BUG_INSTR_VALUE)
 #endif
 
@@ -26,7 +24,6 @@
 #define _BUG(file, line, value) __BUG(file, line, value)
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
-
 #define _BUG_VERBOSE_LINE(__file, __line)			\
 	.pushsection .rodata.str, "aMS", %progbits, 1;		\
 	2: .asciz  __file;					\
@@ -34,6 +31,10 @@
 	3:							\
 	.word 2b;						\
 	.hword __line;						\
+
+#else
+#define _BUG_VERBOSE_LINE(__file, __line)
+#endif
 
 #ifdef CONFIG_GENERIC_BUG
 #define __BUG_ENTRY_GENERIC(__file, __line, __value)		\
@@ -64,15 +65,6 @@ do {								\
 	asm volatile(__stringify(__BUG__LINE(__file, __line, __value))); \
 	unreachable();						\
 } while (0)
-
-#else
-
-#define __BUG(__file, __line, __value)				\
-do {								\
-	asm volatile(BUG_INSTR(__value) "\n");			\
-	unreachable();						\
-} while (0)
-#endif  /* CONFIG_DEBUG_BUGVERBOSE */
 
 #define HAVE_ARCH_BUG
 
