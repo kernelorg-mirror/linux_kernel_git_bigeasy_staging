@@ -27,18 +27,21 @@
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 
-#define __BUG__LINE(__file, __line, __value)			\
-	1: ;							\
-	BUG_ENCODING();						\
-	.pushsection __bug_table,"aw";				\
-	.align 2;						\
-	.word 1b;						\
+#define _BUG_VERBOSE_LINE(__file, __line)			\
 	.pushsection .rodata.str, "aMS", %progbits, 1;		\
 	2: .asciz  __file;					\
 	.popsection;						\
 	3:							\
 	.word 2b;						\
 	.hword __line;						\
+
+#define __BUG__LINE(__file, __line, __value)			\
+	1: ;							\
+	BUG_ENCODING();						\
+	.pushsection __bug_table,"aw";				\
+	.align 2;						\
+	.word 1b;						\
+	_BUG_VERBOSE_LINE(__file, __line);			\
 	.hword 0;						\
 	.popsection;
 
