@@ -20,8 +20,8 @@
 #endif
 
 
-#define BUG() _BUG(__FILE__, __LINE__, BUG_INSTR_VALUE)
-#define _BUG(file, line, value) __BUG(file, line, value)
+#define BUG() _BUG(__FILE__, __LINE__)
+#define _BUG(file, line) __BUG(file, line)
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 #define _BUG_VERBOSE_LINE(__file, __line)			\
@@ -37,22 +37,22 @@
 #endif
 
 #ifdef CONFIG_GENERIC_BUG
-#define __BUG_ENTRY_GENERIC(__file, __line, __value)		\
+#define __BUG_ENTRY_GENERIC(__file, __line, __flags)		\
 	.pushsection __bug_table,"aw";				\
 	.align 2;						\
 	.word 1b;						\
 	_BUG_VERBOSE_LINE(__file, __line);			\
-	.hword 0;						\
+	.hword __flags;						\
 	.popsection;
 
 #else
-#define __BUG_ENTRY_GENERIC(__file, __line, __value)
+#define __BUG_ENTRY_GENERIC(__file, __line, __flags)
 #endif
 
-#define __BUG__LINE(__file, __line, __value)			\
+#define __BUG__LINE(__file, __line, __flags)			\
 	1: ;							\
 	BUG_ENCODING();						\
-	__BUG_ENTRY_GENERIC(__file, __line, __value);
+	__BUG_ENTRY_GENERIC(__file, __line, __flags);
 
 /*
  * The extra indirection is to ensure that the __FILE__ string comes through
@@ -60,9 +60,9 @@
  * preferable to this unpleasantness. We use mergeable string sections to
  * avoid multiple copies of the string appearing in the kernel image.
  */
-#define __BUG(__file, __line, __value)				\
+#define __BUG(__file, __line)					\
 do {								\
-	asm volatile(__stringify(__BUG__LINE(__file, __line, __value))); \
+	asm volatile(__stringify(__BUG__LINE(__file, __line, 0))); \
 	unreachable();						\
 } while (0)
 
