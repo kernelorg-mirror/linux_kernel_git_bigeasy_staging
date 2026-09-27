@@ -30,13 +30,13 @@
 #define __BUG__LINE(__file, __line, __value)			\
 	1: ;							\
 	BUG_ENCODING();						\
+	.pushsection __bug_table,"aw";				\
+	.align 2;						\
+	.word 1b;						\
 	.pushsection .rodata.str, "aMS", %progbits, 1;		\
 	2: .asciz  __file;					\
 	.popsection;						\
-	.pushsection __bug_table,"aw";				\
-	.align 2;						\
 	3:							\
-	.word 1b;						\
 	.word 2b;						\
 	.hword __line;						\
 	.hword 0;						\
