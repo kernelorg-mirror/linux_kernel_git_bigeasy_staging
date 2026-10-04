@@ -65,6 +65,9 @@ do {								\
 	unreachable();						\
 } while (0)
 
+#define __WARN_FLAGS(cond_str, flags)				\
+	asm volatile(__stringify(__BUG_FLAGS(__FILE__, __LINE__, BUGFLAG_WARNING|(flags))))
+
 #define HAVE_ARCH_BUG
 
 #include <asm-generic/bug.h>
