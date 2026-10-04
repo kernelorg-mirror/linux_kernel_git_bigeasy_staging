@@ -19,9 +19,8 @@
 #define BUG_ENCODING() .long ___asm_opcode_to_mem_arm(BUG_INSTR_VALUE)
 #endif
 
-
-#define BUG() _BUG(__FILE__, __LINE__)
-#define _BUG(file, line) __BUG(file, line)
+#define __BUG_FLAGS(__file, __line, __flags)	__BUG_FLAGS_(__file, __line, __flags)
+#define __BUG_FLAGS_(__file, __line, __flags)	__BUG__LINE(__file, __line, __flags)
 
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 #define _BUG_VERBOSE_LINE(__file, __line)			\
@@ -60,9 +59,9 @@
  * preferable to this unpleasantness. We use mergeable string sections to
  * avoid multiple copies of the string appearing in the kernel image.
  */
-#define __BUG(__file, __line)					\
+#define BUG()							\
 do {								\
-	asm volatile(__stringify(__BUG__LINE(__file, __line, 0))); \
+	asm volatile(__stringify(__BUG_FLAGS(__FILE__, __LINE__, 0))); \
 	unreachable();						\
 } while (0)
 
