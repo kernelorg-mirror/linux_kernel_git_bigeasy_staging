@@ -35,15 +35,23 @@
 	.word 2b;						\
 	.hword __line;						\
 
-#define __BUG__LINE(__file, __line, __value)			\
-	1: ;							\
-	BUG_ENCODING();						\
+#ifdef CONFIG_GENERIC_BUG
+#define __BUG_ENTRY_GENERIC(__file, __line, __value)		\
 	.pushsection __bug_table,"aw";				\
 	.align 2;						\
 	.word 1b;						\
 	_BUG_VERBOSE_LINE(__file, __line);			\
 	.hword 0;						\
 	.popsection;
+
+#else
+#define __BUG_ENTRY_GENERIC(__file, __line, __value)
+#endif
+
+#define __BUG__LINE(__file, __line, __value)			\
+	1: ;							\
+	BUG_ENCODING();						\
+	__BUG_ENTRY_GENERIC(__file, __line, __value);
 
 /*
  * The extra indirection is to ensure that the __FILE__ string comes through
