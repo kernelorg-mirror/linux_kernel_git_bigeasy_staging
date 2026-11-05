@@ -122,7 +122,6 @@ SCHED_FEAT(RT_PUSH_IPI, false)
 # endif
 #endif
 
-SCHED_FEAT(RT_RUNTIME_SHARE, false)
 SCHED_FEAT(LB_MIN, false)
 SCHED_FEAT(ATTACH_AGE_LOAD, true)
 

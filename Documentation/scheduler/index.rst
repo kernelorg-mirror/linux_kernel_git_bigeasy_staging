@@ -19,7 +19,6 @@ Scheduler
     schedutil
     sched-util-clamp
     sched-nice-design
-    sched-rt-group
     sched-stats
     sched-ext
     sched-debug

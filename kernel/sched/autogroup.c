@@ -50,11 +50,6 @@ static inline void autogroup_destroy(struct kref *kref)
 {
 	struct autogroup *ag = container_of(kref, struct autogroup, kref);
 
-#ifdef CONFIG_RT_GROUP_SCHED
-	/* We've redirected RT tasks to the root task group... */
-	ag->tg->rt_se = NULL;
-	ag->tg->rt_rq = NULL;
-#endif
 	sched_release_group(ag->tg);
 	sched_destroy_group(ag->tg);
 }
@@ -100,18 +95,6 @@ static inline struct autogroup *autogroup_create(void)
 	init_rwsem(&ag->lock);
 	ag->id = atomic_inc_return(&autogroup_seq_nr);
 	ag->tg = tg;
-#ifdef CONFIG_RT_GROUP_SCHED
-	/*
-	 * Autogroup RT tasks are redirected to the root task group
-	 * so we don't have to move tasks around upon policy change,
-	 * or flail around trying to allocate bandwidth on the fly.
-	 * A bandwidth exception in __sched_setscheduler() allows
-	 * the policy change to proceed.
-	 */
-	free_rt_sched_group(tg);
-	tg->rt_se = root_task_group.rt_se;
-	tg->rt_rq = root_task_group.rt_rq;
-#endif /* CONFIG_RT_GROUP_SCHED */
 	tg->autogroup = ag;
 
 	sched_online_group(tg, &root_task_group);

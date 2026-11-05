@@ -220,9 +220,6 @@ each task belonging to a user.
 CONFIG_CGROUP_SCHED strives to achieve exactly that.  It lets tasks to be
 grouped and divides CPU time fairly among such groups.
 
-CONFIG_RT_GROUP_SCHED permits to group real-time (i.e., SCHED_FIFO and
-SCHED_RR) tasks.
-
 CONFIG_FAIR_GROUP_SCHED permits to group CFS (i.e., SCHED_NORMAL and
 SCHED_BATCH) tasks.
 
