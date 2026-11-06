@@ -24,6 +24,14 @@
 #include "pelt.h"
 
 /*
+ * Admission control for DL tasks. For a root_domain comprising M CPUs,
+ * -deadline tasks can be created while the sum of their bandwidths stays
+ *  below:  M * (dl_period / dl_runtime)
+ */
+static u64 sysfs_dl_period  = 1000000 * NSEC_PER_USEC;
+static u64 sysfs_dl_runtime = 1000000 * NSEC_PER_USEC;
+
+/*
  * Default limits for DL period; on the top end we guard against small util
  * tasks still getting ridiculously long effective runtimes, on the bottom end we
  * guard against timer DoS.
@@ -509,10 +517,10 @@ static void init_dl_rq_bw_ratio(struct dl_rq *dl_rq);
 void init_dl_bw(struct dl_bw *dl_b)
 {
 	raw_spin_lock_init(&dl_b->lock);
-	if (global_rt_runtime() == RUNTIME_INF)
+	if (sysfs_dl_runtime == RUNTIME_INF)
 		dl_b->bw = -1;
 	else
-		dl_b->bw = to_ratio(global_rt_period(), global_rt_runtime());
+		dl_b->bw = to_ratio(sysfs_dl_period, sysfs_dl_runtime);
 	dl_b->total_bw = 0;
 }
 
@@ -3686,10 +3694,8 @@ DEFINE_SCHED_CLASS(dl) = {
  */
 u64 dl_cookie;
 
-int sched_dl_global_validate(void)
+static int sched_dl_global_validate(u64 runtime, u64 period)
 {
-	u64 runtime = global_rt_runtime();
-	u64 period = global_rt_period();
 	u64 new_bw = to_ratio(period, runtime);
 	u64 cookie = ++dl_cookie;
 	struct dl_bw *dl_b;
@@ -3727,18 +3733,18 @@ next:
 
 static void init_dl_rq_bw_ratio(struct dl_rq *dl_rq)
 {
-	if (global_rt_runtime() == RUNTIME_INF) {
+	if (sysfs_dl_runtime == RUNTIME_INF) {
 		dl_rq->bw_ratio = 1 << RATIO_SHIFT;
 		dl_rq->max_bw = dl_rq->extra_bw = 1 << BW_SHIFT;
 	} else {
-		dl_rq->bw_ratio = to_ratio(global_rt_runtime(),
-			  global_rt_period()) >> (BW_SHIFT - RATIO_SHIFT);
+		dl_rq->bw_ratio = to_ratio(sysfs_dl_runtime,
+			  sysfs_dl_period) >> (BW_SHIFT - RATIO_SHIFT);
 		dl_rq->max_bw = dl_rq->extra_bw =
-			to_ratio(global_rt_period(), global_rt_runtime());
+			to_ratio(sysfs_dl_period, sysfs_dl_runtime);
 	}
 }
 
-void sched_dl_do_global(void)
+static void sched_dl_do_global(void)
 {
 	u64 new_bw = -1;
 	u64 cookie = ++dl_cookie;
@@ -3746,8 +3752,8 @@ void sched_dl_do_global(void)
 	int cpu;
 	unsigned long flags;
 
-	if (global_rt_runtime() != RUNTIME_INF)
-		new_bw = to_ratio(global_rt_period(), global_rt_runtime());
+	if (sysfs_dl_runtime != RUNTIME_INF)
+		new_bw = to_ratio(sysfs_dl_period, sysfs_dl_runtime);
 
 	for_each_possible_cpu(cpu)
 		init_dl_rq_bw_ratio(&cpu_rq(cpu)->dl);
@@ -4098,3 +4104,139 @@ void print_dl_stats(struct seq_file *m, int cpu)
 {
 	print_dl_rq(m, cpu, &cpu_rq(cpu)->dl);
 }
+
+#define SCHED_ATTR(_name)					\
+	static struct kobj_attribute sched_attr_## _name =	\
+	__ATTR(_name, 0644, sched_attr_##_name##_show, sched_attr_##_name##_store)
+
+static int sched_dl_try_boundary(int runtime, int period)
+{
+	int ret;
+	u64 runtime_ns;
+	u64 period_ns;
+
+	if (runtime) {
+		if (runtime < 0)
+			runtime_ns = RUNTIME_INF;
+		else
+			runtime_ns = runtime * NSEC_PER_USEC;
+	} else {
+		runtime_ns = sysfs_dl_runtime;
+	}
+
+	if (period)
+		period_ns = period * NSEC_PER_USEC;
+	else
+		period_ns = sysfs_dl_period;
+
+	if (runtime_ns != RUNTIME_INF) {
+		if (runtime_ns > period_ns || runtime_ns > MAX_BW)
+			return -EINVAL;
+	}
+
+	sched_domains_mutex_lock();
+	ret = sched_dl_global_validate(runtime_ns, period_ns);
+	if (ret) {
+		sched_domains_mutex_unlock();
+		return ret;
+	}
+
+	sysfs_dl_period = period_ns;
+	sysfs_dl_runtime = runtime_ns;
+
+	sched_dl_do_global();
+	sched_domains_mutex_unlock();
+	/*
+	 * After changing maximum available bandwidth for DEADLINE, we need to
+	 * recompute per root domain and per cpus variables accordingly.
+	 */
+	rebuild_sched_domains();
+	return 0;
+}
+
+static ssize_t sched_attr_dl_runtime_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	u64 val = sysfs_dl_runtime;
+
+	if (val == RUNTIME_INF)
+		val = -1;
+	else
+		do_div(val, NSEC_PER_USEC);
+
+	return sysfs_emit(buf, "%lld\n", val);
+}
+
+static ssize_t sched_attr_dl_runtime_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t count)
+{
+	int val;
+	int ret;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+
+	if (!(val == -1 || val > 0))
+		return -EINVAL;
+
+	ret = sched_dl_try_boundary(val, 0);
+	if (ret)
+		return ret;
+	return count;
+}
+SCHED_ATTR(dl_runtime);
+
+static ssize_t sched_attr_dl_period_show(struct kobject *kobj, struct kobj_attribute *attr,
+			  char *buf)
+{
+	u64 val = sysfs_dl_period;
+
+	do_div(val, NSEC_PER_USEC);
+	return sysfs_emit(buf, "%lld\n", val);
+}
+
+static ssize_t sched_attr_dl_period_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t count)
+{
+	int val;
+	int ret;
+
+	ret = kstrtoint(buf, 0, &val);
+	if (ret)
+		return ret;
+	if (val <= 0)
+		return -EINVAL;
+
+	ret = sched_dl_try_boundary(0, val);
+	if (ret)
+		return ret;
+	return count;
+}
+SCHED_ATTR(dl_period);
+
+static struct attribute *sched_global_attrs[] = {
+	&sched_attr_dl_runtime.attr,
+	&sched_attr_dl_period.attr,
+	NULL,
+};
+
+static const struct attribute_group sched_global_attrs_group = {
+	.attrs = sched_global_attrs,
+};
+
+static int __init sched_dl_init(void)
+{
+	struct kobject *sched_kobj, *fair_kobj = NULL;
+	int ret;
+
+	sched_kobj = kobject_create_and_add("sched", kernel_kobj);
+	if (sched_kobj)
+		fair_kobj = kobject_create_and_add("fair_server", sched_kobj);
+	if (!fair_kobj)
+		return -ENOMEM;
+	pr_err("%s(%d)\n", __func__, __LINE__);
+	ret = sysfs_create_group(sched_kobj, &sched_global_attrs_group);
+	return 0;
+}
+late_initcall(sched_dl_init);

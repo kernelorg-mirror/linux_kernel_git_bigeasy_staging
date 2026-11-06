@@ -341,8 +341,6 @@ struct dl_bw {
 };
 
 extern void init_dl_bw(struct dl_bw *dl_b);
-extern int  sched_dl_global_validate(void);
-extern void sched_dl_do_global(void);
 extern int  sched_dl_overflow(struct task_struct *p, int policy, const struct sched_attr *attr);
 extern void __setparam_dl(struct task_struct *p, const struct sched_attr *attr);
 extern void __getparam_dl(struct task_struct *p, struct sched_attr *attr, unsigned int flags);
@@ -2424,19 +2422,6 @@ extern union sched_feat_key sched_feat_keys[__SCHED_FEAT_NR];
 
 extern struct static_key_false sched_numa_balancing;
 extern struct static_key_false sched_schedstats;
-
-static inline u64 global_rt_period(void)
-{
-	return (u64)sysctl_sched_rt_period * NSEC_PER_USEC;
-}
-
-static inline u64 global_rt_runtime(void)
-{
-	if (sysctl_sched_rt_runtime < 0)
-		return RUNTIME_INF;
-
-	return (u64)sysctl_sched_rt_runtime * NSEC_PER_USEC;
-}
 
 /*
  * Is p the current execution context?

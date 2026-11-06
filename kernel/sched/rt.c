@@ -1952,7 +1952,6 @@ static int sched_rt_handler(const struct ctl_table *table, int write, void *buff
 	int ret;
 
 	mutex_lock(&mutex);
-	sched_domains_mutex_lock();
 	old_period = sysctl_sched_rt_period;
 	old_runtime = sysctl_sched_rt_runtime;
 
@@ -1960,28 +1959,12 @@ static int sched_rt_handler(const struct ctl_table *table, int write, void *buff
 
 	if (!ret && write) {
 		ret = sched_rt_global_validate();
-		if (ret)
-			goto undo;
-
-		ret = sched_dl_global_validate();
-		if (ret)
-			goto undo;
-
-		sched_dl_do_global();
+		if (ret) {
+			sysctl_sched_rt_period = old_period;
+			sysctl_sched_rt_runtime = old_runtime;
+		}
 	}
-	if (0) {
-undo:
-		sysctl_sched_rt_period = old_period;
-		sysctl_sched_rt_runtime = old_runtime;
-	}
-	sched_domains_mutex_unlock();
 	mutex_unlock(&mutex);
-
-	/*
-	 * After changing maximum available bandwidth for DEADLINE, we need to
-	 * recompute per root domain and per cpus variables accordingly.
-	 */
-	rebuild_sched_domains();
 
 	return ret;
 }
