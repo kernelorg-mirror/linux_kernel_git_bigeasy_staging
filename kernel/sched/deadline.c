@@ -1921,6 +1921,31 @@ int dl_server_apply_params(struct sched_dl_entity *dl_se, u64 runtime, u64 perio
 	return 0;
 }
 
+#ifdef CONFIG_RCU_TORTURE_TEST
+/*
+ * The RCU-TORTURE built-in test will disable fair-server to avoid any
+ * throttling while testing RCU-boosting.
+ * If compiled as module then the user needs to disable it manually before
+ * loading the module.
+ */
+void dl_server_fair_disable(unsigned int cpu);
+
+void dl_server_fair_disable(unsigned int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+	int retval;
+
+	scoped_guard (rq_lock_irqsave, rq) {
+		struct sched_dl_entity *dl_se = &rq->fair_server;
+
+		update_rq_clock(rq);
+		dl_server_stop(dl_se);
+		retval = dl_server_apply_params(dl_se, 0, dl_se->dl_period, 0);
+	}
+	WARN_ON_ONCE(retval);
+}
+#endif
+
 /*
  * Add @dl_se's bw to the root-domain accounting.
  *
